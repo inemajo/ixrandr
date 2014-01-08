@@ -1,0 +1,4 @@
+ixrandr
+=======
+
+interactive xrandr
