@@ -1,0 +1,28 @@
+#!/bin/bash
+# bash completion for ixrandr
+
+_ixrandr()
+{
+    local cur
+    COMPREPLY=()
+    cur=${COMP_WORDS[COMP_CWORD]}
+
+    if [ $COMP_CWORD -eq 1 ]
+    then 
+        COMPREPLY=($(compgen -W "--rl --print --dialog --help $(ixrandr --print)" -- "$cur"))
+        return
+    fi
+
+    if [ -n "$(echo ${COMP_CWORD[1]} | grep -e '--')" ]
+    then
+	pos=$(($COMP_CWORD-2))
+	declare -a opts=( ${COMP_WORDS[@]:2:$pos} )
+    else
+	pos=$(($COMP_CWORD-1))
+	declare -a opts=( ${COMP_WORDS[@]:1:$pos} )
+    fi
+    comps=$(ixrandr --print ${opts[@]})
+    COMPREPLY=($(compgen -W "$comps"  -- "$cur"))
+    return 0
+} &&
+complete -F _ixrandr ixrandr

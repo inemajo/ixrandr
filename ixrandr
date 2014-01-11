@@ -215,6 +215,10 @@ if __name__ == "__main__":
         def __init__(self, interface, outputs):
             self.__interface = interface
             self.reloadOutputs(outputs)
+            self.__exec = True
+
+        def noexec(self):
+            self.__exec = False
 
         def reloadOutputs(self, outputs):
             tmp = outputs # a changer
@@ -231,7 +235,7 @@ if __name__ == "__main__":
 
             if not test:
                 if not self.__interface:
-                    print("avaible outputs: %s" % (self.__possibleOutputs))
+                    print(' '.join(self.__possibleOutputs))
                     exit(0)
                 if len(self.__possibleOutputs) == 1:
                     firstOutput = self.__possibleOutputs[0]
@@ -250,7 +254,7 @@ if __name__ == "__main__":
 
         def __chooseAction(self, output, test = None):
             l = []
-            if len(self.__possibleOutputs) == 1 and self.__interface:
+            if len(self.__possibleOutputs) == 1 and self.__interface and not test:
                 l += ["same-as " + self.__possibleOutputs[0]]
                 l += ["left-of " + self.__possibleOutputs[0]]
                 l += ["right-of " + self.__possibleOutputs[0]] 
@@ -315,6 +319,8 @@ if __name__ == "__main__":
             return res
 
         def __doaction(self, output, action, action_arg):
+            if not self.__exec:
+                exit(0)
             if self.__outputs[output]["enable"] == False:
                 os.system("xrandr --output %s --auto" % (output))
 
@@ -372,7 +378,7 @@ if __name__ == "__main__":
         def         parse_opt(self):
             opts = self.get_opts()
             if sys.argv[1][:2] != '--':
-                opt = 'print'
+                opt = 'exec'
                 sys.argv = [''] + sys.argv # tres moche a refaire
             else:
                 opt = sys.argv[1][2:]
@@ -423,11 +429,18 @@ if __name__ == "__main__":
             pi.start(output, action, action_arg)
             exit(0)
         
-        help_print = ": interactive print (if no option selected this is the default option)"
+        help_print = ": print possible arguments (usefull for completion)"
         def         opt_print(self, output, action, action_arg):
             pi = ixrandr(None, self.outputs)
+            pi.noexec()
             pi.start(output, action, action_arg)
             exit(0)            
+
+        help_exec = ": default option, like print but execute action"
+        def         opt_exec(self, output, action, action_arg):
+            pi = ixrandr(None, self.outputs)
+            pi.start(output, action, action_arg)
+            exit(0)
 
         # help_json = ": print outputs informations in json format"
         # def         opt_json(self, *args):
@@ -436,16 +449,18 @@ if __name__ == "__main__":
         #     for output in self.outputs:
         #         print(json.dumps(output))
 
+    # if len(sys.argv) == 1:
+    #     for output in process_xrandr():
+    #         totr = ""
+    #         for r in output["resolutions"]:
+    #             totr += '%s ' % (r)
+    #         if totr:
+    #             print("%s %s %s %s" % (output["name"], output["status"], output["enable"], totr[:-1]))
+    #         else:
+    #             print("%s %s %s" % (output["name"], output["status"], output["enable"]))            
+    # else:
     if len(sys.argv) == 1:
-        for output in process_xrandr():
-            totr = ""
-            for r in output["resolutions"]:
-                totr += '%s ' % (r)
-            if totr:
-                print("%s %s %s %s" % (output["name"], output["status"], output["enable"], totr[:-1]))
-            else:
-                print("%s %s %s" % (output["name"], output["status"], output["enable"]))            
-    else:
-        a = ixrandr_parser()
-        a.parse_opt()
-        exit(0)
+        sys.argv = sys.argv + ['--help']
+    a = ixrandr_parser()
+    a.parse_opt()
+    exit(0)
