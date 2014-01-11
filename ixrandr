@@ -133,9 +133,9 @@ if __name__ == "__main__":
             head_argv = ["--menu", desc, '20', '40', '50']
             argv = []
 
-            for i in range(0, len(l)):
+            for i, li in enumerate(l):
                 argv.append(str(i))
-                argv.append(l[i])
+                argv.append(li)
             return argv[self.__process(head_argv + argv) * 2 + nameORi]
 
 
@@ -144,10 +144,10 @@ if __name__ == "__main__":
         """Gets a single character from standard input.  Does not echo to the
     screen."""
         def __init__(self):
-            try:
-                self.impl = _GetchWindows()
-            except ImportError:
-                self.impl = _GetchUnix()
+            # try:
+            #     self.impl = _GetchWindows()
+            # except ImportError:
+                  self.impl = _GetchUnix()
 
         def __call__(self): return self.impl()
     class _GetchUnix:
@@ -164,13 +164,13 @@ if __name__ == "__main__":
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
             return ch
-    class _GetchWindows:
-        def __init__(self):
-            import msvcrt
+    # class _GetchWindows:
+    #     def __init__(self):
+    #         import msvcrt
 
-        def __call__(self):
-            import msvcrt
-            return msvcrt.getch()
+    #     def __call__(self):
+    #         import msvcrt
+    #         return msvcrt.getch()
     getch = _Getch()
     ## end From stackoverflow
 
@@ -179,14 +179,15 @@ if __name__ == "__main__":
         def         menu(self, desc, l, nameORi):
             # nameORi = True -> l[i], = False -> i
             print(desc)
-            for i in range(0, len(l)):
-                print("%s%d%s: %s" % ("\033[31m", i, "\033[39m", l[i]))
+            for i, line in enumerate(l):
+                print("%s%d%s: %s" % ("\033[31m", i, "\033[39m", line))
 
             choice = None
             while not choice:
                 try:
                     if len(l) <= 10:
-                        sys.stdout.write("What you choice?:")
+                        sys.stdout.write("What you choice?(p for previous): ")
+                        sys.stdout.flush()
                         line = getch()
                         if ord(line) == 3 or ord(line) == 4:
                             exit(1)
@@ -197,6 +198,8 @@ if __name__ == "__main__":
                     print("KeyboardInterrupt")
                     exit(1)
                 try:
+                    if line == 'p':
+                        raise interfaceException(0, "Cancel")
                     i = int(line)
                     choice = l[i]
                 except ValueError:
@@ -207,95 +210,143 @@ if __name__ == "__main__":
                 return i
             return choice
 
-    class   ixrandrIntercative:
+    class   ixrandr:
 
         def __init__(self, interface, outputs):
-            self.__interface = interface()
+            self.__interface = interface
             self.reloadOutputs(outputs)
 
         def reloadOutputs(self, outputs):
             tmp = outputs # a changer
             self.__outputs = dict()
+            self.__possibleOutputs = []
             for output in tmp:
                 self.__outputs[output["name"]] = output
 
-        def __chooseFirstOutput(self):
-            possibleOutputs = []
-            for name, info in self.__outputs.items():
-                if info["enable"] == True or info["status"] == "connected":
-                    possibleOutputs.append(name)
+        def __chooseFirstOutput(self, test = None):
+            self.__possibleOutputs = []
+            for name, output in self.__outputs.items():
+                if output["enable"] == True or output["status"] == 'connected':
+                    self.__possibleOutputs.append(output["name"])
 
-            firstOutput = self.__interface.menu("Choose your output:", possibleOutputs, True)
-            possibleOutputs.remove(firstOutput)
-            return possibleOutputs, firstOutput
+            if not test:
+                if not self.__interface:
+                    print("avaible outputs: %s" % (self.__possibleOutputs))
+                    exit(0)
+                if len(self.__possibleOutputs) == 1:
+                    firstOutput = self.__possibleOutputs[0]
+                    print("Auto select output: '%s'" % (firstOutput))
+                else:
+                    firstOutput = self.__interface.menu("Choose your output:", self.__possibleOutputs, True)
+                    print("Output selected: '%s'" % (firstOutput))
+            elif test in self.__possibleOutputs:
+                firstOutput = test
+            else:
+                print("Output doesn't exist")
+                exit(1)
+                
+            self.__possibleOutputs.remove(firstOutput)
+            return firstOutput
 
-        def __chooseAction(self, possibleOutputs, firstOutput):
+        def __chooseAction(self, output, test = None):
             l = []
-            if len(possibleOutputs) == 1:
-                secondOutput = possibleOutputs[0]
-                l = ["same-as " + secondOutput, "left-of " + secondOutput, "right-of " + secondOutput]
-            elif len(possibleOutputs) > 1:
-                l = ["same-as", "left-of", "right-of"]        
-            l += ["change-resolution", "off"]
+            if len(self.__possibleOutputs) == 1 and self.__interface:
+                l += ["same-as " + self.__possibleOutputs[0]]
+                l += ["left-of " + self.__possibleOutputs[0]]
+                l += ["right-of " + self.__possibleOutputs[0]] 
+            elif self.__possibleOutputs:
+                l += ["same-as", "left-of", "right-of"]
+
+            l += ["resolution"]
+            if self.__outputs[output]['enable'] == True:
+                l += ["off"]
+
+            if test:
+                if test in l:
+                    return test
+                else:
+                    print("Action doesn't exist for output " + output)
+                    exit(1)
+
+            if not self.__interface:
+                print("%s" % (' '.join(l)))
+                exit(0)
+
+            if len(l) == 1:
+                print("auto select action: '%s'" % (l[0]))
+                return l[0]
             action = self.__interface.menu("What do we do? :", l, True).split(' ')[0] # split if len(possibleOutputs) == 1
+            print("Action selected: '%s'" % (action))
             return action
 
-        def __chooseSecondOutput(self, possibleOutputs):
-            if len(possibleOutputs) == 1:
-                return possibleOutputs[0]
-            secondOutput = self.__interface.menu("Choose your output:", possibleOutputs, True)
+        def __chooseSecondOutput(self, test = None):
+            if test:
+                if test in self.__possibleOutputs:
+                    return test
+                else:
+                    print("Impossible to use this output")
+                    exit(1)
+
+            if not self.__interface:
+                print("%s" % (' '.join(self.__possibleOutputs)))
+                exit(0)
+                
+            if len(self.__possibleOutputs) == 1:
+                print("Auto select second output: '%s'" % (self.__possibleOutputs[0]))
+                return self.__possibleOutputs[0]
+            secondOutput = self.__interface.menu("Choose your output:", self.__possibleOutputs, True)
+            print("Second output selected: '%s'" % (secondOutput))
             return secondOutput
 
-        def __doaction(self, firstOutput, action, secondOutput = None):
-            fo_info = dict()
-            for o in self.__outputs.values():
-                if o["name"] == firstOutput:
-                    fo_info = o
-                    break
-            if fo_info["enable"] == False:
-                os.system("xrandr --output %s --auto" % (firstOutput))
-
-            if type(secondOutput) == type(None):
-                if action == "change-resolution":
-                    res = self.__interface.menu("Choose your resolution:", self.__outputs[firstOutput]["resolutions"], True)
-                    print("output %s change-resolution: %s" % (firstOutput, res))
-                    os.system("xrandr --output %s --mode %s" % (firstOutput, res))
-                elif action == "off":
-                    print("output %s: %s" % (firstOutput, action))
-                    os.system("xrandr --output %s --off" % (firstOutput))
+        def __chooseResolution(self, output, test = None):
+            if test:
+                if test in self.__outputs[output]['resolutions']:
+                    return test
                 else:
-                    sys.stderr.write("error unknow action '%s'\n" % (action))
+                    print('Resolution not found for output ' + output)
                     exit(1)
-            elif action in ["same-as", "left-of", "right-of"]:
-                fo_info = dict()
-                for o in self.__outputs.values():
-                    if o["name"] == secondOutput:
-                        fo_info = o
-                        break
-                if fo_info["enable"] == False:
-                    os.system("xrandr --output %s --auto" % (secondOutput))
 
-                print("Output %s is %s output %s" % (firstOutput, action, secondOutput))
-                os.system("xrandr --output %s --%s %s" % (firstOutput, action, secondOutput))
+            if not self.__interface:
+                print("%s" % (' '.join(self.__outputs[output]["resolutions"])))
+                exit(0)
 
-        def start(self):
+            res = self.__interface.menu("Choose your resolution:", self.__outputs[output]["resolutions"], True)
+            print("Resolution selected: '%s'" % (res))
+            return res
+
+        def __doaction(self, output, action, action_arg):
+            if self.__outputs[output]["enable"] == False:
+                os.system("xrandr --output %s --auto" % (output))
+
+            if action in ["same-as", "left-of", "right-of"]:
+                if self.__outputs[action_arg]["enable"] == False:
+                    os.system("xrandr --output %s --auto" % (action_arg))
+                print("Output %s is %s output %s" % (output, action, action_arg))
+            else:
+                print("Output %s %s %s" % (output, action, action_arg))
+            os.system("xrandr --output %s --%s %s" % (output, action, action_arg))
+
+        def start(self, arg_output = None, arg_action = None, arg_action_arg = None):
             lvl = 0
             while True:
                 try:
                     if lvl == 0:
-                        possibleOutputs, firstOutput = self.__chooseFirstOutput()
-                        print("Output: '%s'\r\n" % (firstOutput))
+                        output = self.__chooseFirstOutput(arg_output)
                         lvl = 1
                     elif lvl == 1:
-                        action = self.__chooseAction(possibleOutputs, firstOutput)
+                        action = self.__chooseAction(output, arg_action)
                         lvl = 2
                     elif lvl == 2:
-                        print("action: '%s'\r\n" % (action))
+                        if action == 'resolution':
+                            action = 'mode'
+
                         if action in ["left-of", "same-as", "right-of"]:
-                            secondOutput = self.__chooseSecondOutput(possibleOutputs)
-                            self.__doaction(firstOutput, action, secondOutput)
-                        else:
-                            self.__doaction(firstOutput, action)
+                            action_arg = self.__chooseSecondOutput(arg_action_arg)
+                        elif action == 'mode':
+                            action_arg = self.__chooseResolution(output, arg_action_arg)
+                        elif action == 'off':
+                            action_arg = ''
+                        self.__doaction(output, action, action_arg)
                         break
                 except interfaceException as e:
                     if e.error == 0: # user cancel
@@ -306,21 +357,7 @@ if __name__ == "__main__":
                     else:
                         raise e
 
-
-    def ixrandr_dialog(outputs):
-        pi = ixrandrIntercative(dialog, outputs)
-        pi.start()
-        exit(0)
-
-    def ixrandr_rl(outputs):
-        pi = ixrandrIntercative(readline, outputs)
-        pi.start()
-        exit(0)
-
-    # Tres important il faut mettre self.__class__ et pas self tout seul
-    #         setattr(self.__class__, "do_" + out, self.tst)
-
-    class           ixrandr:
+    class           ixrandr_parser:
 
         def         __init__(self):
             self.outputs = process_xrandr()
@@ -334,15 +371,32 @@ if __name__ == "__main__":
 
         def         parse_opt(self):
             opts = self.get_opts()
-            opt = sys.argv[1][2:]
+            if sys.argv[1][:2] != '--':
+                opt = 'print'
+                sys.argv = [''] + sys.argv # tres moche a refaire
+            else:
+                opt = sys.argv[1][2:]
+            output = None
+            action = None
+            action_arg = None
+            if len(sys.argv) >= 3:
+                output = sys.argv[2]
+            if len(sys.argv) >= 4:
+                action = sys.argv[3]
+            if len(sys.argv) == 5:
+                action_arg = sys.argv[4]
+            elif len(sys.argv) > 5:
+                print("Too many arguments")
+                exit(1)
+
             if not opt in opts:
                 print("!!! Unknow opt !!!")
                 self.opt_help()
                 exit(1)
-            getattr(self, "opt_" + opt)()
+            getattr(self, "opt_" + opt)(output, action, action_arg)
 
         help_help = ": display help"
-        def         opt_help(self):
+        def         opt_help(self, *args):
             opts = self.get_opts()
             maxl = 0
             for opt in opts:
@@ -358,60 +412,29 @@ if __name__ == "__main__":
                 print("  --%s%s%s" % (opt, ' ' * (maxl - len(opt)), s))
 
         help_dialog = ": interactive with dialog UNIX program"
-        def         opt_dialog(self):
-            ixrandr_dialog(self.outputs)
+        def         opt_dialog(self, output, action, action_arg):
+            pi = ixrandr(dialog(), self.outputs)
+            pi.start(output, action, action_arg)
+            exit(0)
 
         help_rl = ": interactive basic"
-        def         opt_rl(self):
-            ixrandr_rl(self.outputs)
+        def         opt_rl(self, output, action, action_arg):
+            pi = ixrandr(readline(), self.outputs)
+            pi.start(output, action, action_arg)
+            exit(0)
+        
+        help_print = ": interactive print (if no option selected this is the default option)"
+        def         opt_print(self, output, action, action_arg):
+            pi = ixrandr(None, self.outputs)
+            pi.start(output, action, action_arg)
+            exit(0)            
 
-        help_json = ": print outputs informations in json format"
-        def         opt_json(self):
-            import json
+        # help_json = ": print outputs informations in json format"
+        # def         opt_json(self, *args):
+        #     import json
 
-            for output in self.outputs:
-                print(json.dumps(output))
-
-        help_resol = ": print currently avaible resolutions of one output"
-        def         opt_resol(self):
-            if (len(sys.argv) != 3):
-                self.opt_help()
-                exit(1)
-            for output in self.outputs:
-                if output["name"] == sys.argv[2]:
-                    for res in output["resolutions"]:
-                        print(res)
-                    exit(0)
-            print("Unknow output \"%s\"" % (sys.argv[2]))
-            exit(1)
-
-        help_list = "[arguments] : display outputs list. Argument is a filter (co,de,en,di,re)"
-        def         opt_list(self):
-            if len(sys.argv) == 2:
-                filtre = None
-            else:
-                filtre = sys.argv[2][0:2]
-                if not filtre in ["co", "de", "en", "di", "re"]:
-                    self.opt_help()
-                    exit(1)
-            for output in self.outputs:
-                if not filtre:
-                    print(output["name"])
-                elif filtre == "co" and output['status'] == 'connected':
-                    print(output["name"])
-                elif filtre == "de" and output['status'] == 'disconnected':
-                    print(output["name"])
-                elif filtre == "en" and output['enable'] == True:
-                    print(output["name"])
-                elif filtre == "di" and output['enable'] == False:
-                    print(output["name"])
-                elif filtre == "re":
-                    string = output["name"] + " "
-                    for res in output["resolutions"]:
-                        string += res
-                        string += " "
-                    # pas de \n ? output["resolutions"][-1][-1] == '\n' ?
-                    print(string)
+        #     for output in self.outputs:
+        #         print(json.dumps(output))
 
     if len(sys.argv) == 1:
         for output in process_xrandr():
@@ -423,6 +446,6 @@ if __name__ == "__main__":
             else:
                 print("%s %s %s" % (output["name"], output["status"], output["enable"]))            
     else:
-        a = ixrandr()
+        a = ixrandr_parser()
         a.parse_opt()
         exit(0)
