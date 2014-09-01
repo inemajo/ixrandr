@@ -200,6 +200,8 @@ if __name__ == "__main__":
                 try:
                     if line == 'p':
                         raise interfaceException(0, "Cancel")
+                    elif line == 'q':
+                        exit(1)
                     i = int(line)
                     choice = l[i]
                 except ValueError:
@@ -269,6 +271,8 @@ if __name__ == "__main__":
                 l += ["resolution"]
             if self.__outputs[output]['enable'] == True:
                 l += ["off"]
+            if len(self.__possibleOutputs) == 2:
+                l += 'swap'
 
             if tryAction:
                 if tryAction in l:
@@ -343,10 +347,8 @@ if __name__ == "__main__":
                 try:
                     if lvl == 1:
                         output = self.__chooseFirstOutput(arg_output)
-
                     elif lvl == 2:
                         action = self.__chooseAction(output, arg_action)
-
                     elif lvl == 3:
                         if action == 'resolution':
                             action = 'mode'
@@ -357,9 +359,19 @@ if __name__ == "__main__":
                             action_arg = self.__chooseResolution(output, arg_action_arg)
                         elif action == 'off':
                             action_arg = ''
+                        elif action == 'swap':
+                            if self.__outputs[output]['enable'] == True:
+                                os.system("xrandr --output %s --auto" % (action_arg))
+                                action = 'off'
+                                action_arg = ''
+                            else:
+                                os.system("xrandr --output %s --auto" % (output))
+                                output = action_arg
+                                action_arg = ''
+                                action = 'off'
                         self.__doaction(output, action, action_arg)
-                    lvl += 1
 
+                    lvl += 1
                 except interfaceException as e:
                     if e.error == 0: # user cancel
                         lvl -= 1
@@ -404,13 +416,15 @@ if __name__ == "__main__":
             output = None
             action = None
             action_arg = None
-            if len(sys.argv) - i >= 3:
+            i += 1
+            i = len(sys.argv) - i
+            if i >= 1:
                 output = sys.argv[2]
-            if len(sys.argv) - i >= 4:
+            if i >= 2:
                 action = sys.argv[3]
-            if len(sys.argv) - i == 5:
+            if i == 3:
                 action_arg = sys.argv[4]
-            elif len(sys.argv) - i > 5:
+            if i > 3 or i < 0:
                 print("Too many arguments")
                 exit(1)
 
