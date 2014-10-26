@@ -94,24 +94,28 @@ def process_xrandr():
 
 #
 # complete menu
-def complete(subjet, possible):
+def complete(subject, possible):
     print(' '.join(possible))
     exit(0)
 
 #
-# readline menu    
-def readline(subject, possible):
+# readchar menu    
+def readchar(subject, possible):
         import sys, tty, termios
 
         for i, opt in enumerate(possible):
             print('\033[31m{}\033[39m: {}'.format(i, opt))
+        if sys.version_info.major == 2:
+            sys.stdout.write(subject)
+        else:
+            print(subject,end="",flush=True)
         while 1:
-            if sys.version_info.major == 2:
-                sys.stdout.write(subject)
-            else:
-                print(subject,end="",flush=True)
             fd = sys.stdin.fileno()
-            old_settings = termios.tcgetattr(fd)
+            try:
+                old_settings = termios.tcgetattr(fd)
+            except termios.error:
+                print('\n--rl option doesn\'t work in pipe')
+                exit(1)
             try:
                 tty.setraw(sys.stdin.fileno())
                 ch = sys.stdin.read(1)
@@ -120,10 +124,50 @@ def readline(subject, possible):
             if ch.isdigit() and int(ch) < len(possible):
                 print(ch)
                 return possible[int(ch)]
-            elif ord(ch) == 3: # ctrl+c
+            elif ord(ch) == 3 or ord(ch) == 4 or ch == 'q': # ctrl+c/ctrl+d
+                print("")
                 exit(0)
+
+##
+## readline
+def readline(subject, possible):
+    class Completer:
+        def __init__(self, words):
+            self.words = words
+            self.prefix = None
+        def complete(self, prefix, index):
+            if prefix != self.prefix:
+                # we have a new prefix!
+                # find all words that start with this prefix
+                self.matching_words = [
+                    w for w in self.words
+                    if w.lower().startswith(prefix.lower())
+                ]
+                self.prefix = prefix
+            try:
+                return self.matching_words[index]
+            except IndexError:
+                return None
+    import readline
+    completer = Completer(possible)
+    readline.parse_and_bind("tab: complete")
+    readline.set_completer(completer.complete)
+
+    for i, opt in enumerate(possible):
+        print('\033[31m{}\033[39m: {}'.format(i, opt))
+    while 1:
+        try:
+            if sys.version_info.major >= 3:
+                choose = input(subject)
             else:
-                print("{} not valid".format(ord(ch)))    
+                choose = raw_input(subject)
+        except KeyboardInterrupt:
+            print("")
+            exit(0)
+        if choose.isdigit() and int(choose) < len(possible):
+            return possible[int(choose)]
+        elif choose in possible:
+            return choose
 
 #
 # dialog menu
@@ -173,7 +217,7 @@ def select_output1(outputs, output1 = None):
         global quiet, assume
         if output1 is None:
                 if len(outputs) > 1 or assume == False:
-                    output1 = menu("Select your output:", list(outputs.keys()))
+                    output1 = menu("Select your output: ", list(outputs.keys()))
                 else:
                     output1 = list(outputs.keys())[0]
         if not quiet:
@@ -190,7 +234,7 @@ def select_output1(outputs, output1 = None):
 
 def select_action(output, output_actions, action = None):
     if action is None:
-        action = menu("What action for {}:".format(output), output_actions)
+        action = menu("What action for {}: ".format(output), output_actions)
 
     if action.startswith('left-of') or action.startswith('right-of'):
         action = action.split(' ')[0] # if action == "left-of VGA1"
@@ -206,6 +250,8 @@ def select_action_arg(possible, menu_text, choosed = None):
         print('Invalid value {}'.format(choosed))
     return choosed
 
+#
+# parsing arguments
 parser = argparse.ArgumentParser(description='interactive xrandr')
 parser.add_argument("output", type=str,
                     help="output to select", nargs='?')
@@ -214,22 +260,31 @@ parser.add_argument("action", type=str,
 parser.add_argument("action_arg", type=str,
                     help="argument for action to output", nargs='?')
 group = parser.add_mutually_exclusive_group(required=False)
-group.add_argument("--rl", help="use readline", action="store_true")
+group.add_argument("--rl", help="use readline with completion",
+                   action="store_true")
+group.add_argument("--rc", help="use readchar", action="store_true")
 group.add_argument("--dialog", help="use dialog", action="store_true")
 group.add_argument("--complete", help="use for shellscript",
                    action="store_true")
 args = parser.parse_args()
 quiet = False
 assume = True
+execute = True
+
 if args.dialog:
     menu = dialog
 elif args.complete:
     menu = complete
     quiet = True
     assume = False
+    execute = False
+elif args.rc:
+    menu = readchar
 else: # --rl is the default
     menu = readline
 
+#
+# begin ixrandr
 screens = process_xrandr()
 screen1 = select_screen(screens)
 outputs = { n:o
@@ -249,25 +304,28 @@ action = select_action(output1, output_actions, args.action)
 
 if action == 'resolution':
     avaible_res = screens[screen1]['outputs'][output1]['avaible_res']
-    txt = 'Choose your resolution for {}'.format(output1)
+    txt = 'Choose your resolution for {}: '.format(output1)
     resolution = select_action_arg(avaible_res, txt, args.action_arg)
-    change_output_resolution(output1, resolution)
+    if execute:
+        change_output_resolution(output1, resolution)
 
 elif action == 'rotation':
     rots = ['normal', 'inverted', 'left', 'right']
-    rotation = select_action_arg(rots, "Select your rotation:", args.action_arg)
-    set_output_rotation(output1, rotation)
+    rotation = select_action_arg(rots, "Select your rotation: ", args.action_arg)
+    if execute:
+        set_output_rotation(output1, rotation)
 
 elif action == 'off':
-    print('pas pendant les tests')
-    output_off(output1)
+    if execute:
+        output_off(output1)
 
 elif action in ['left-of', 'right-of']:
-    output2 = select_action_arg(outputs, '{} of :'.format(action),
+    output2 = select_action_arg(outputs, '{} of : '.format(action),
                                 args.action_arg)
     if screens[screen1]['outputs'][output1]['enable'] == False:
         enable_output(output1)
     if screens[screen1]['outputs'][output2]['enable'] == False:
         enable_output(output2)
-    set_output_relative_pos_to_output(output1, action, output2)
+    if execute:
+        set_output_relative_pos_to_output(output1, action, output2)
 exit(0)

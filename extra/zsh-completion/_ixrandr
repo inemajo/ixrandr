@@ -1,0 +1,12 @@
+#compdef ixrandr
+
+_ixrandr ()
+{
+    last=#words[@]-1
+    _arguments \
+	"*:ixandr:( $( ixrandr --complete ${words[@]:1:$last} ) )"
+
+    return 0
+}
+
+_ixrandr "$@"
