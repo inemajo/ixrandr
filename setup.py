@@ -13,6 +13,6 @@ setup(
         'Environment :: Console',
         "Natural Language :: English",
         "Programming Language :: Python :: 2.7",
-    ]
-    scripts=["ixrandr"]
+    ],
+    scripts = ['ixrandr'],
 )
