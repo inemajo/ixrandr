@@ -70,6 +70,7 @@ def process_xrandr():
         elif cols[1] in ['connected', 'disconnected']:
             output = {}
             output['name'] = cols[0]
+            output["avaible_res"] = []
             screens[cur_screen]['outputs'][output['name']] = output
             if cols[1] == 'connected':
                 output['connected'] = True
@@ -320,7 +321,7 @@ elif action == 'off':
         output_off(output1)
 
 elif action in ['left-of', 'right-of']:
-    output2 = select_action_arg(outputs, '{} of : '.format(action),
+    output2 = select_action_arg(list(outputs.keys()), '{} of : '.format(action),
                                 args.action_arg)
     if screens[screen1]['outputs'][output1]['enable'] == False:
         enable_output(output1)
