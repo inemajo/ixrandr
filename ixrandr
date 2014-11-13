@@ -72,7 +72,8 @@ def process_xrandr():
             output['name'] = cols[0]
             output["avaible_res"] = []
             screens[cur_screen]['outputs'][output['name']] = output
-            if cols[1] == 'connected':
+# ICIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
+            if cols[1] == 'connected' or output['name'] == 'VGA1':
                 output['connected'] = True
             else:
                 output['connected'] = False
@@ -226,10 +227,10 @@ def select_output1(outputs, output1 = None):
 
         outputs.pop(output1, None)
         output_actions = ["off", "resolution", "rotation"]
-        if len(outputs) == 1:
+        if len(outputs) == 1 and assume:
             output_actions += ["left-of " + list(outputs.keys())[0],
                                "right-of " + list(outputs.keys())[0]]
-        elif len(outputs) > 1:
+        elif len(outputs) >= 1:
             output_actions += ["left-of", "right-of"]
         return output1, output_actions
 
