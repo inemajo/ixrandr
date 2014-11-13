@@ -72,8 +72,7 @@ def process_xrandr():
             output['name'] = cols[0]
             output["avaible_res"] = []
             screens[cur_screen]['outputs'][output['name']] = output
-# ICIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII
-            if cols[1] == 'connected' or output['name'] == 'VGA1':
+            if cols[1] == 'connected':
                 output['connected'] = True
             else:
                 output['connected'] = False
