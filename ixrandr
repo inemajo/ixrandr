@@ -4,7 +4,7 @@ from __future__ import print_function
 from subprocess import check_output, Popen, PIPE
 import sys
 import os
-import argparse
+import argparse	
 
 #
 # Xrandr commands
@@ -226,19 +226,13 @@ def select_output1(outputs, output1 = None):
 
         outputs.pop(output1, None)
         output_actions = ["off", "resolution", "rotation"]
-        if len(outputs) == 1 and assume:
-            output_actions += ["left-of " + list(outputs.keys())[0],
-                               "right-of " + list(outputs.keys())[0]]
-        elif len(outputs) >= 1:
+        if len(outputs) >= 1:
             output_actions += ["left-of", "right-of"]
         return output1, output_actions
 
 def select_action(output, output_actions, action = None):
     if action is None:
         action = menu("What action for {}: ".format(output), output_actions)
-
-    if action.startswith('left-of') or action.startswith('right-of'):
-        action = action.split(' ')[0] # if action == "left-of VGA1"
     return action
 
 def select_action_arg(possible, menu_text, choosed = None):
@@ -296,12 +290,27 @@ outputs = { n:o
 if args.output and args.output not in outputs.keys():
     print('{} is not a valid output'.format(args.output))
     exit(1)
+    
 output1, output_actions = select_output1(outputs, args.output)
+
+
 
 if args.action and args.action not in output_actions:
     print('{} is not a valid action'.format(args.action))
     exit(1)
+
+if len(outputs) == 1:
+    for i, action in enumerate(output_actions):
+        if action in ['left-of', 'right-of'] :
+            action += ' {}'.format(outputs[0])
+            output_actions[i] = action
+        
 action = select_action(output1, output_actions, args.action)
+
+if action.startswith('left-of') or action.startswith('right-of'):
+    action = action.split(' ')[0]
+
+
 
 if action == 'resolution':
     avaible_res = screens[screen1]['outputs'][output1]['avaible_res']
